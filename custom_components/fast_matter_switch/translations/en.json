@@ -1,0 +1,14 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Fast Matter switch",
+        "description": "Listens to the Matter server and fires an event the moment a Matter button is touched, without waiting for the double-press window."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Fast Matter switch is already set up.",
+      "no_matter": "Set up the Matter integration first."
+    }
+  }
+}
