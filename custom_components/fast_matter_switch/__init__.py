@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Fast Matter switch.
 
 Home Assistant's Matter integration reports a button that supports multi-press only once the double-press window has

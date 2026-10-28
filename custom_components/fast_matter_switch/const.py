@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Constants for Fast Matter switch."""
 
 DOMAIN = "fast_matter_switch"

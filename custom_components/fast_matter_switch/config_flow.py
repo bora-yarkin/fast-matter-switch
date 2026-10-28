@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Setup flow for Fast Matter switch: a single confirmation, no settings."""
 
 from __future__ import annotations

@@ -24,3 +24,7 @@ triggers:
       entity_id: event.boras_bedroom_desk_switch_button_1
       event_type: initial_press
 ```
+
+## Licence
+
+GPL-3.0-or-later. See `LICENSE`. Contributions: see `.github/CONTRIBUTING.md`.
