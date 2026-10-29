@@ -25,7 +25,6 @@ import logging
 import time
 
 from aiohttp import ClientError, WSMsgType
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -46,6 +45,11 @@ RETRY_MAX_S = 30
 HEARTBEAT_S = 30
 # The first message after start_listening carries every node, which is a few hundred kilobytes.
 MAX_MESSAGE_BYTES = 16 * 1024 * 1024
+
+
+def _is_number(value: object) -> bool:
+    """A whole number from the server (a boolean is not one)."""
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _matter_url(hass: HomeAssistant) -> str | None:
@@ -77,13 +81,14 @@ class MatterEventRelay:
     async def run(self) -> None:
         delay = RETRY_START_S
         while True:
+            started = time.monotonic()
             try:
                 await self._listen()
-                delay = RETRY_START_S
-            except (ClientError, OSError, asyncio.TimeoutError) as err:
+            except (ClientError, OSError, TimeoutError) as err:
                 _LOGGER.warning("Lost the Matter server connection (%s); trying again in %s s", err, delay)
+            # A connection that held for a while was healthy, so the next try is quick; one that dropped at once backs off.
+            delay = RETRY_START_S if time.monotonic() - started >= HEARTBEAT_S else min(delay * 2, RETRY_MAX_S)
             await asyncio.sleep(delay)
-            delay = min(delay * 2, RETRY_MAX_S)
 
     async def _listen(self) -> None:
         url = _matter_url(self._hass)
@@ -95,7 +100,10 @@ class MatterEventRelay:
             _LOGGER.info("Listening to Matter switch events on %s", url)
             async for msg in ws:
                 if msg.type == WSMsgType.TEXT:
-                    self._handle(msg.data)
+                    try:
+                        self._handle(msg.data)
+                    except Exception:  # one message that cannot be read must not stop every button
+                        _LOGGER.exception("Could not read a Matter server message")
                 elif msg.type in (WSMsgType.CLOSED, WSMsgType.CLOSING, WSMsgType.ERROR):
                     break
 
@@ -107,25 +115,32 @@ class MatterEventRelay:
             message = json.loads(raw)
         except ValueError:
             return
-        data = message.get("data") if message.get("event") == "node_event" else None
-        if not data or data.get("cluster_id") != SWITCH_CLUSTER_ID:
+        if not isinstance(message, dict) or message.get("event") != "node_event":
+            return
+        data = message.get("data")
+        if not isinstance(data, dict) or data.get("cluster_id") != SWITCH_CLUSTER_ID:
             return
         event_type = SWITCH_EVENT_TYPES.get(data.get("event_id"))
-        if event_type is None:
-            return
         node_id, endpoint_id = data.get("node_id"), data.get("endpoint_id")
-        payload = data.get("data") or {}
-        fired = {"event_type": event_type, "node_id": node_id, "endpoint_id": endpoint_id}
-        button = _button_entity(self._hass, node_id, endpoint_id) if node_id is not None else None
-        fired["entity_id"] = button.entity_id if button else None
-        fired["device_id"] = button.device_id if button else None
+        if event_type is None or not _is_number(node_id) or not _is_number(endpoint_id):
+            return
+        payload = data.get("data")
+        payload = payload if isinstance(payload, dict) else {}
+        button = _button_entity(self._hass, node_id, endpoint_id)
+        fired = {
+            "event_type": event_type,
+            "node_id": node_id,
+            "endpoint_id": endpoint_id,
+            "entity_id": button.entity_id if button else None,
+            "device_id": button.device_id if button else None,
+        }
         if event_type == "initial_press":
             now = time.monotonic()
             before = self._last_press.get((node_id, endpoint_id))
             self._last_press[(node_id, endpoint_id)] = now
             fired["since_last_press_ms"] = None if before is None else round((now - before) * 1000)
         presses = payload.get("totalNumberOfPressesCounted") or payload.get("currentNumberOfPressesCounted")
-        if presses:
+        if _is_number(presses) and presses:
             fired["presses"] = presses
         self._hass.bus.async_fire(EVENT_NAME, fired)
 

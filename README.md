@@ -25,6 +25,19 @@ triggers:
       event_type: initial_press
 ```
 
+## How it behaves
+
+- It opens one extra connection to the Matter server the Matter integration already uses, asks for events (`start_listening`) and ignores everything that is not a
+  Generic Switch event. The first answer carries every node and is a few hundred kilobytes; messages up to 16 MB are accepted.
+- If the connection drops it tries again after 1 second, then 2, 4, up to 30 seconds; a connection that held for 30 seconds or more starts the count again.
+- A message it cannot read is logged and skipped; the next one is served.
+- `entity_id` and `device_id` are `None` when the Matter integration has no event entity for that button.
+
+## Tests
+
+`tests/` runs the integration against a real WebSocket server standing in for the Matter server. Not measured: how many milliseconds it saves compared with the Matter
+integration's own event, which depends on the switch.
+
 ## Licence
 
 GPL-3.0-or-later. See `LICENSE`. Contributions: see `.github/CONTRIBUTING.md`.
