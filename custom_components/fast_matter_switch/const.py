@@ -17,3 +17,18 @@ SWITCH_EVENT_TYPES = {
     5: "multi_press_ongoing",
     6: "multi_press_complete",
 }
+
+# What each button's event entity reports (see event.py).
+PRESS = "press"
+DOUBLE_PRESS = "double_press"
+LONG_PRESS = "long_press"
+EVENT_ENTITY_TYPES = [PRESS, DOUBLE_PRESS, LONG_PRESS]
+
+# A touch that follows the previous touch of the same button within this time is the second touch of a double press (or a
+# press the switch reported twice), not a press of its own.
+DOUBLE_TOUCH_MS = 800
+
+
+def dispatch_signal(button_unique_id: str) -> str:
+    """The signal the relay sends to the event entity of one Matter button."""
+    return f"{DOMAIN}_{button_unique_id}"

@@ -10,6 +10,12 @@ opens a second connection to the same Matter server and fires every Matter Gener
 Copy `custom_components/fast_matter_switch` to `/config/custom_components/`, restart Home Assistant, then add
 **Fast Matter switch** under Settings, Devices & services. It needs the Matter integration and uses its server address.
 
+## Event entities
+
+Each Matter button gets an event entity, `event.<the Matter button's name>_fast`, in the same area as the switch. It reports `press` (the first touch of a press), `double_press` and `long_press`. A touch within 800 ms
+of the previous touch of the same button is the second touch of a double press, or a press the switch reported twice, and is not reported as a `press`. In the automation editor use the **Event received** trigger,
+pick the entity, then the event types; no YAML is needed. The entity has no device of its own (Home Assistant gives a device to one integration only); it is added when a Matter button appears and removed when it goes.
+
 ## Event
 
 `fast_matter_switch_event` with `event_type` (`initial_press`, `short_release`, `long_press`, `long_release`,

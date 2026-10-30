@@ -15,6 +15,9 @@ The event data:
   since_last_press_ms   initial_press only: milliseconds since the same button last reported an initial press, or
                None for the first one. An automation uses it to act once on a double press (the second touch
                follows the first within about half a second) and on a press that a switch reports twice.
+
+Each Matter button also gets an event entity (event.py) that reports ``press``, ``double_press`` and ``long_press``
+with that rule already applied, for automations built in the editor.
 """
 
 from __future__ import annotations
@@ -26,16 +29,23 @@ import time
 
 from aiohttp import ClientError, WSMsgType
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import (
+    DOUBLE_PRESS,
+    DOUBLE_TOUCH_MS,
     EVENT_NAME,
+    LONG_PRESS,
     MATTER_DOMAIN,
+    PRESS,
     SWITCH_CLUSTER_ID,
     SWITCH_EVENT_TYPES,
+    dispatch_signal,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,6 +55,20 @@ RETRY_MAX_S = 30
 HEARTBEAT_S = 30
 # The first message after start_listening carries every node, which is a few hundred kilobytes.
 MAX_MESSAGE_BYTES = 16 * 1024 * 1024
+
+
+PLATFORMS = [Platform.EVENT]
+
+
+def _fast_event_type(event_type: str, since_last_press_ms: int | None, presses: int | None) -> str | None:
+    """What the button's event entity reports for a Switch event, or None when it reports nothing."""
+    if event_type == "initial_press":
+        return PRESS if since_last_press_ms is None or since_last_press_ms > DOUBLE_TOUCH_MS else None
+    if event_type == "multi_press_complete":
+        return DOUBLE_PRESS if presses == 2 else None
+    if event_type == "long_press":
+        return LONG_PRESS
+    return None
 
 
 def _is_number(value: object) -> bool:
@@ -143,15 +167,19 @@ class MatterEventRelay:
         if _is_number(presses) and presses:
             fired["presses"] = presses
         self._hass.bus.async_fire(EVENT_NAME, fired)
+        fast = _fast_event_type(event_type, fired.get("since_last_press_ms"), fired.get("presses"))
+        if button is not None and fast is not None:
+            async_dispatcher_send(self._hass, dispatch_signal(button.unique_id), fast)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if _matter_url(hass) is None:
         raise ConfigEntryNotReady("The Matter integration is not set up yet")
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_create_background_task(hass, MatterEventRelay(hass).run(), "fast_matter_switch relay")
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # The relay is a background task of the entry and is cancelled with it.
-    return True
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
