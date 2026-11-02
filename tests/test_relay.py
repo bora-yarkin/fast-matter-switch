@@ -44,6 +44,17 @@ async def test_every_switch_event_type_is_fired_with_the_buttons_entity(hass, re
     assert all(e.data["entity_id"] == button.entity_id and e.data["node_id"] == 41 and e.data["endpoint_id"] == 1 for e in events)
 
 
+async def test_a_latching_switch_reports_the_position_it_moved_to(hass, relay, matter_server, button):
+    events = async_capture_events(hass, EVENT_NAME)
+    await matter_server.send(node_event(41, 1, 0, {"newPosition": 1}))
+    await matter_server.send(node_event(41, 1, 0, {"newPosition": "up"}))
+    await matter_server.send(node_event(41, 1, 0))
+    await settle(hass, events, 3)
+    assert [e.data["event_type"] for e in events] == ["switch_latched"] * 3
+    assert [e.data.get("position") for e in events] == [1, None, None]
+    assert all(e.data["entity_id"] == button.entity_id for e in events)
+
+
 async def test_presses_are_reported_for_multi_press_events_only_when_the_server_counts_them(hass, relay, matter_server, button):
     events = async_capture_events(hass, EVENT_NAME)
     await matter_server.send(node_event(41, 1, 5, {"currentNumberOfPressesCounted": 2}))

@@ -7,10 +7,12 @@ reads the Switch cluster events as they arrive and fires them on the event bus a
 automation can react at the first touch.
 
 The event data:
-  event_type   initial_press, short_release, long_press, long_release, multi_press_ongoing or multi_press_complete
+  event_type   switch_latched (a latching switch, such as a rocker, changed position), initial_press, short_release,
+               long_press, long_release, multi_press_ongoing or multi_press_complete
   entity_id    the Matter event entity of that button (None when it is not known)
   device_id    its device
   node_id, endpoint_id   where the event came from
+  position     switch_latched only: the position the switch moved to
   presses      the number of presses counted (multi_press_ongoing and multi_press_complete only)
   since_last_press_ms   initial_press only: milliseconds since the same button last reported an initial press, or
                None for the first one. An automation uses it to act once on a double press (the second touch
@@ -166,6 +168,9 @@ class MatterEventRelay:
         presses = payload.get("totalNumberOfPressesCounted") or payload.get("currentNumberOfPressesCounted")
         if _is_number(presses) and presses:
             fired["presses"] = presses
+        position = payload.get("newPosition")
+        if event_type == "switch_latched" and _is_number(position):
+            fired["position"] = position
         self._hass.bus.async_fire(EVENT_NAME, fired)
         fast = _fast_event_type(event_type, fired.get("since_last_press_ms"), fired.get("presses"))
         if button is not None and fast is not None:

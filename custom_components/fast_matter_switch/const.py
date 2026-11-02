@@ -10,6 +10,7 @@ EVENT_NAME = "fast_matter_switch_event"
 # The Matter Switch cluster, and its events as the Matter server numbers them.
 SWITCH_CLUSTER_ID = 59
 SWITCH_EVENT_TYPES = {
+    0: "switch_latched",
     1: "initial_press",
     2: "long_press",
     3: "short_release",
