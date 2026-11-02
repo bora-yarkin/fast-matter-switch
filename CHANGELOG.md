@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow [semant
 
 ## [Unreleased]
 
+## [0.4.1]
+
+- The manifest keys are in the order Home Assistant's validation (hassfest) requires. No change in behaviour.
+
 ## [0.4.0]
 
 - Latching switches (rockers that stay in a position) are reported on the event bus as `switch_latched`, with the `position` they moved to.
