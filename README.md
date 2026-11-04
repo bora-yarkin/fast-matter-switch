@@ -1,7 +1,7 @@
 # Fast Matter switch
 
 [![CI](https://github.com/bora-yarkin/fast-matter-switch/actions/workflows/ci.yml/badge.svg)](https://github.com/bora-yarkin/fast-matter-switch/actions/workflows/ci.yml)
-[![Add to HACS](https://img.shields.io/badge/HACS-custom%20repository-41BDF5.svg)](#install-with-hacs)
+[![Marketplace](https://img.shields.io/badge/Marketplace-custom%20repository-41BDF5.svg)](#install-with-the-marketplace)
 
 A Home Assistant custom integration that reacts to a Matter button **at the first touch**.
 
@@ -41,13 +41,13 @@ and a bus event, `fast_matter_switch_event`, for automations that need every det
 - Developed and tested on Home Assistant 2026.10, with IKEA BILRESA buttons. Other switches should work the same way
   because they use the same Matter cluster, but only the BILRESA has been tried on real hardware.
 
-## Install with HACS
+## Install with the Marketplace
 
-Fast Matter switch is not in the default HACS list; add it as a custom repository.
+Fast Matter switch is not in the Marketplace's default list; add it from its link (Home Assistant 2026.11 and later; older versions use HACS with a custom repository of type **Integration**).
 
-1. In Home Assistant open **HACS**, then the three-dot menu, then **Custom repositories**.
-2. Repository: `https://github.com/bora-yarkin/fast-matter-switch`, type: **Integration**. Add it.
-3. Find **Fast Matter switch** in HACS, download it, and **restart Home Assistant**.
+1. In Home Assistant open **Settings, Marketplace**, then **Add from link**.
+2. Repository: `https://github.com/bora-yarkin/fast-matter-switch`. Add it.
+3. Find **Fast Matter switch** in the Marketplace, download it, and **restart Home Assistant**.
 4. Go to **Settings, Devices & services, Add integration**, choose **Fast Matter switch** and confirm. There is nothing
    to configure.
 
