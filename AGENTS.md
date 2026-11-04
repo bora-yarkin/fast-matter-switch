@@ -9,4 +9,4 @@
 - Tests: `uv venv --python 3.14 .venv && uv pip install --python .venv/bin/python pytest-homeassistant-custom-component==0.13.375 ruff`, then `.venv/bin/python -m pytest` and
   `.venv/bin/ruff check . && .venv/bin/ruff format --check .`. The tests run a real WebSocket server standing in for the Matter server; nothing is mocked inside the integration.
 - Nothing reaches the network except the Matter server's own address. No new dependency without asking the owner.
-- Licence GPL-3.0-or-later; Python files start with the SPDX line. Public at https://github.com/bora-yarkin/fast-matter-switch, installed through HACS as a custom repository (not in the HACS default list, and not planned to be). A release is a tag `vX.Y.Z` plus a GitHub release whose version matches `manifest.json`.
+- Licence GPL-3.0-or-later; Python files start with the SPDX line. Public at https://github.com/bora-yarkin/fast-matter-switch, installed through the Marketplace (HACS inside Home Assistant) as a custom repository (not in its default list, and not planned to be). A release is a tag `vX.Y.Z` plus a GitHub release whose version matches `manifest.json`.
