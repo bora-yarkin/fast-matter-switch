@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow [semant
 
 ## [Unreleased]
 
+- The `fast_matter_switch_event` bus event carries `fast_event_type` (`press`, `double_press` or `long_press`) when the button's event entity reports something for it, so other integrations can use the same rule without repeating it.
+
 ## [0.4.2]
 
 - Installation notes now describe the Marketplace that replaces HACS in Home Assistant 2026.11. No change in behaviour.
