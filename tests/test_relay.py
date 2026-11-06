@@ -203,3 +203,14 @@ async def test_without_the_matter_integration_setup_waits(hass):
     entry.add_to_hass(hass)
     assert not await hass.config_entries.async_setup(entry.entry_id)
     assert entry.state is ConfigEntryState.SETUP_RETRY
+
+
+async def test_the_event_says_what_the_buttons_entity_reports(hass, relay, matter_server, button):
+    events = async_capture_events(hass, EVENT_NAME)
+    await matter_server.send(node_event(41, 1, 1))  # first touch
+    await matter_server.send(node_event(41, 1, 1))  # second touch right after: not a press
+    await matter_server.send(node_event(41, 1, 6, {"totalNumberOfPressesCounted": 2}))
+    await matter_server.send(node_event(41, 1, 2))
+    await matter_server.send(node_event(41, 1, 3))  # a release reports nothing
+    await settle(hass, events, 5)
+    assert [e.data.get("fast_event_type") for e in events] == ["press", None, "double_press", "long_press", None]

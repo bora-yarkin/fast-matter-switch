@@ -13,6 +13,8 @@ The event data:
   device_id    its device
   node_id, endpoint_id   where the event came from
   position     switch_latched only: the position the switch moved to
+  fast_event_type   what the button's event entity reports for this event (press, double_press or long_press), present
+               only when it reports something; the second touch of a double press has none
   presses      the number of presses counted (multi_press_ongoing and multi_press_complete only)
   since_last_press_ms   initial_press only: milliseconds since the same button last reported an initial press, or
                None for the first one. An automation uses it to act once on a double press (the second touch
@@ -171,8 +173,10 @@ class MatterEventRelay:
         position = payload.get("newPosition")
         if event_type == "switch_latched" and _is_number(position):
             fired["position"] = position
-        self._hass.bus.async_fire(EVENT_NAME, fired)
         fast = _fast_event_type(event_type, fired.get("since_last_press_ms"), fired.get("presses"))
+        if fast is not None:
+            fired["fast_event_type"] = fast
+        self._hass.bus.async_fire(EVENT_NAME, fired)
         if button is not None and fast is not None:
             async_dispatcher_send(self._hass, dispatch_signal(button.unique_id), fast)
 

@@ -103,6 +103,7 @@ button.)
 | `node_id`, `endpoint_id` | where the event came from on the Matter fabric |
 | `presses` | the number of presses counted, on `multi_press_ongoing` and `multi_press_complete` |
 | `since_last_press_ms` | on `initial_press` only: milliseconds since the same button's previous `initial_press`, `None` the first time |
+| `fast_event_type` | `press`, `double_press` or `long_press` when the button's event entity reports something for this event; absent otherwise (the second touch of a double press has none) |
 | `position` | on `switch_latched` only: the position a latching switch (a rocker) moved to |
 
 Latching switches (rockers that stay in a position) report `switch_latched` on the bus event only; they get no event
