@@ -3,6 +3,7 @@
 - Domain `fast_matter_switch`. `__init__.py`: a relay that keeps a second WebSocket connection to the Matter server
   (the address comes from the Matter integration's config entry) and fires each Matter Generic Switch event as `fast_matter_switch_event`. `event.py`: one device-less event entity per Matter button
   (`press`, `double_press`, `long_press`; the rule that the second touch of a double press is not a press lives in `__init__._fast_event_type` and `const.DOUBLE_TOUCH_MS`), for automations built in the editor. No options.
+- `coordinator.py`, `server.py` and `binary_sensor.py` (the Reachable sensors): every ten minutes a short-lived WebSocket to the Matter server lists the nodes (`get_nodes`) and pings the sleepy ones (Thread RoutingRole `0/53/1` = 2) with `ping_node`; each gets `binary_sensor.<area>_<device>_reachable`, linked to its Matter device in the registry. A failed round makes the sensors unavailable, not off. The Matter device is found by the node id inside its identifier (`deviceid_<fabric>-<node as 16 hex digits>-MatterNodeDevice`). Home Control's device-offline notification watches these sensors.
 - It reads the Matter integration's entity registry entries to name the button (`entity_id`, `device_id`); that relies on the unique id format
   `<fabric>-<node as 16 hex digits>-MatterNodeDevice-<endpoint>-GenericSwitch-59-1`, checked against a real installation on 2026-10-29. If a Home Assistant update changes it,
   `_button_entity` and the id in `tests/conftest.py` are the two places to change.
