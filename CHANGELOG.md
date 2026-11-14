@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow [semant
 
 ## [Unreleased]
 
+- **Reachable sensors.** A battery-powered Matter device (a BILRESA remote, a door sensor) sleeps between presses, so Home Assistant keeps showing it as available after it has left the network. Every such device (a sleepy end device in the Thread mesh) is now pinged through the Matter server every ten minutes and gets a `binary_sensor.<area>_<device>_reachable`: on when it answered, off when it did not, unavailable (not off) while the Matter server cannot be asked; `last_reachable` says when it last answered. The sensor is linked to the Matter device, so it appears on the device's page. This is the code of the separate Matter reachability integration, which is gone: after updating, delete that integration, and Home Control's device-offline notification watches the sensors.
+
 ## [0.5.0]
 
 - The `fast_matter_switch_event` bus event carries `fast_event_type` (`press`, `double_press` or `long_press`) when the button's event entity reports something for it, so other integrations can use the same rule without repeating it.

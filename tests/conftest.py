@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 import pytest
 from aiohttp import web
+from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -31,13 +33,28 @@ def node_event(node: int, endpoint: int, event_id: int, data: dict | None = None
     )
 
 
+SLEEPY, END_DEVICE, ROUTING_END_DEVICE = 2, 4, 5
+
+
+def node(node_id: int, role: int, *, bridge: bool = False) -> dict:
+    """One node as the Matter server lists it (only what the integration reads)."""
+    return {"node_id": node_id, "is_bridge": bridge, "available": True, "attributes": {"0/53/1": role}}
+
+
 class FakeMatterServer:
+    """Answers get_nodes and ping_node (`pings` says how each node answers: a dict of address -> bool, "error" or "silent").
+    `commands` holds what the event relay sent, `queries` what the reachability check sent."""
+
     def __init__(self) -> None:
+        self.nodes: list[dict] = []
+        self.pings: dict[int, object] = {}
+        self.queries: list[dict] = []
         self.commands: list[dict] = []
         self.connections = 0
         self.url = ""
         self.close_at_once = False
         self._sockets: list[web.WebSocketResponse] = []
+        self._relay: web.WebSocketResponse | None = None
         self._runner: web.AppRunner | None = None
 
     async def _handler(self, request: web.Request) -> web.WebSocketResponse:
@@ -50,8 +67,27 @@ class FakeMatterServer:
             return ws
         async for message in ws:
             if message.type == web.WSMsgType.TEXT:
-                self.commands.append(json.loads(message.data))
+                command = json.loads(message.data)
+                if command["command"] in ("get_nodes", "ping_node"):
+                    self.queries.append(command)
+                    asyncio.get_running_loop().create_task(self._answer(ws, command))
+                else:
+                    self.commands.append(command)
+                    self._relay = ws
         return ws
+
+    async def _answer(self, ws: web.WebSocketResponse, command: dict) -> None:
+        message_id = command["message_id"]
+        if command["command"] == "get_nodes":
+            await ws.send_str(json.dumps({"message_id": message_id, "result": self.nodes}))
+            return
+        behaviour = self.pings.get(command["args"]["node_id"], {"fd00::1": True})
+        if behaviour == "silent":
+            return
+        if behaviour == "error":
+            await ws.send_str(json.dumps({"message_id": message_id, "error_code": 8, "details": "node not found"}))
+            return
+        await ws.send_str(json.dumps({"message_id": message_id, "result": behaviour}))
 
     async def start(self) -> None:
         app = web.Application()
@@ -71,10 +107,10 @@ class FakeMatterServer:
         raise AssertionError("the integration never sent start_listening")
 
     async def send(self, raw: str) -> None:
-        await self._sockets[-1].send_str(raw)
+        await self._relay.send_str(raw)
 
     async def drop(self) -> None:
-        await self._sockets[-1].close()
+        await self._relay.close()
 
     async def stop(self) -> None:
         for ws in self._sockets:
@@ -119,3 +155,35 @@ async def relay(hass, matter_entry, matter_server):
     await matter_server.listening()
     yield entry
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+def add_device(hass, matter_entry, node_id: int, name: str, area: str | None = None) -> dr.DeviceEntry:
+    """A Matter device in the registry, with the identifier the Matter integration gives it (as seen on a real installation)."""
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=matter_entry.entry_id,
+        identifiers={("matter", f"deviceid_{FABRIC}-{node_id:016X}-MatterNodeDevice")},
+        name=name,
+    )
+    if area:
+        device = dr.async_get(hass).async_update_device(device.id, area_id=ar.async_get(hass).async_get_or_create(area).id)
+    return device
+
+
+@pytest.fixture
+async def set_up(hass, matter_entry) -> AsyncIterator[Callable[[], Awaitable[MockConfigEntry]]]:
+    """Sets Fast Matter switch up (when the test is ready), runs one round of pings and unloads it afterwards."""
+    entries: list[MockConfigEntry] = []
+
+    async def _set_up() -> MockConfigEntry:
+        entry = MockConfigEntry(domain=DOMAIN, data={})
+        entry.add_to_hass(hass)
+        entries.append(entry)
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        # The relay runs for as long as the entry does, so the tests wait for the pings by asking for them.
+        await entry.runtime_data.async_refresh()
+        await hass.async_block_till_done()
+        return entry
+
+    yield _set_up
+    for entry in entries:
+        await hass.config_entries.async_unload(entry.entry_id)

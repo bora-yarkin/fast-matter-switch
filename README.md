@@ -33,6 +33,21 @@ and a bus event, `fast_matter_switch_event`, for automations that need every det
 - The entity has no device of its own (Home Assistant gives a device to one integration only), so it is listed under
   the entities of the area it starts in.
 
+### Reachable sensors
+
+A battery-powered Matter device (a BILRESA remote, a door sensor) sleeps between presses, so Home Assistant hears
+nothing from it for hours and keeps showing it as *available* even when it has left the network. Every such device
+(a sleepy end device in the Thread mesh) is pinged through the Matter server every ten minutes and gets a
+`binary_sensor.<area>_<device>_reachable`, linked to the Matter device:
+
+- **on** when the device answered its last ping, **off** when it did not (a ping takes several seconds, since the
+  device answers when it next polls its parent), and **unavailable** (not off) while the Matter server itself cannot be asked;
+- `last_reachable` says when it last answered;
+- mains-powered devices, routers and bridges get none; a device that joins later gets one at the next round.
+
+A device that stays off for a while is gone from the network or has a dead battery (the sensor cannot tell which).
+Use the sensor in an automation, or in Home Control's device-offline notification.
+
 ## Requirements
 
 - Home Assistant with the **Matter** integration set up and working, with a Matter server (the Matter Server app or

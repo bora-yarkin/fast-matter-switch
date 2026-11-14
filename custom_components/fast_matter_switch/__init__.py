@@ -22,6 +22,11 @@ The event data:
 
 Each Matter button also gets an event entity (event.py) that reports ``press``, ``double_press`` and ``long_press``
 with that rule already applied, for automations built in the editor.
+
+A battery-powered Matter device (the IKEA BILRESA remote, a door sensor...) sleeps between presses, so Home Assistant hears
+nothing from it for hours and keeps showing it as available even when it has left the network. The integration pings every
+such device every few minutes through the same connection address and gives each a "Reachable" binary sensor (binary_sensor.py):
+on when it answered, off when it did not. The dashboard's device-offline notification watches these sensors.
 """
 
 from __future__ import annotations
@@ -46,22 +51,24 @@ from .const import (
     EVENT_NAME,
     LONG_PRESS,
     MATTER_DOMAIN,
+    MAX_MESSAGE_BYTES,
     PRESS,
     SWITCH_CLUSTER_ID,
     SWITCH_EVENT_TYPES,
     dispatch_signal,
 )
+from .coordinator import ReachabilityCoordinator
+from .server import matter_url
 
 _LOGGER = logging.getLogger(__name__)
 
 RETRY_START_S = 1
 RETRY_MAX_S = 30
 HEARTBEAT_S = 30
-# The first message after start_listening carries every node, which is a few hundred kilobytes.
-MAX_MESSAGE_BYTES = 16 * 1024 * 1024
 
+PLATFORMS = [Platform.EVENT, Platform.BINARY_SENSOR]
 
-PLATFORMS = [Platform.EVENT]
+type FastMatterSwitchConfigEntry = ConfigEntry[ReachabilityCoordinator]
 
 
 def _fast_event_type(event_type: str, since_last_press_ms: int | None, presses: int | None) -> str | None:
@@ -78,15 +85,6 @@ def _fast_event_type(event_type: str, since_last_press_ms: int | None, presses: 
 def _is_number(value: object) -> bool:
     """A whole number from the server (a boolean is not one)."""
     return isinstance(value, int) and not isinstance(value, bool)
-
-
-def _matter_url(hass: HomeAssistant) -> str | None:
-    """The address of the Matter server, as the Matter integration has it."""
-    for entry in hass.config_entries.async_entries(MATTER_DOMAIN):
-        url = entry.data.get("url")
-        if url:
-            return url
-    return None
 
 
 def _button_entity(hass: HomeAssistant, node_id: int, endpoint_id: int):
@@ -119,7 +117,7 @@ class MatterEventRelay:
             await asyncio.sleep(delay)
 
     async def _listen(self) -> None:
-        url = _matter_url(self._hass)
+        url = matter_url(self._hass)
         if url is None:
             raise OSError("the Matter integration has no server address")
         session = async_get_clientsession(self._hass)
@@ -181,14 +179,18 @@ class MatterEventRelay:
             async_dispatcher_send(self._hass, dispatch_signal(button.unique_id), fast)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    if _matter_url(hass) is None:
+async def async_setup_entry(hass: HomeAssistant, entry: FastMatterSwitchConfigEntry) -> bool:
+    if matter_url(hass) is None:
         raise ConfigEntryNotReady("The Matter integration is not set up yet")
+    coordinator = ReachabilityCoordinator(hass, entry)
+    entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_create_background_task(hass, MatterEventRelay(hass).run(), "fast_matter_switch relay")
+    # The first round of pings takes several seconds per sleeping device, so it must not hold up Home Assistant's startup.
+    entry.async_create_background_task(hass, coordinator.async_refresh(), "fast_matter_switch first reachability refresh")
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: FastMatterSwitchConfigEntry) -> bool:
     # The relay is a background task of the entry and is cancelled with it.
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
